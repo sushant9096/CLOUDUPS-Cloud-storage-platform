@@ -18,6 +18,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.*;
 import java.util.ArrayList;
+import downloader.*;
 
 
 public class Home_page extends JFrame {
@@ -46,6 +47,8 @@ public class Home_page extends JFrame {
     JSONObject filesobj;
     int totalfiles=0;
 
+    int selectedfileindex;
+
 
 
     Home_page(){
@@ -58,6 +61,8 @@ public class Home_page extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(600,500);
         setVisible(true);
+        deleteFileButton.setVisible(false);
+        downloadButton.setVisible(false);
         //end ini
 
 
@@ -101,16 +106,49 @@ public class Home_page extends JFrame {
         });
 
 
+        refresh_btn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+            setVisible(false);
+            new Home_page();
+            dispose();
 
+            }
+        });
+
+        deleteFileButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                //System.out.println(selectedfileindex);
+
+                deleteFile( ( (JSONObject)filesobj.get(Integer.toString(selectedfileindex)) ).get("id").toString()  );
+            }
+        });
+
+        downloadButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String f= ( (JSONObject)filesobj.get(Integer.toString(selectedfileindex)) ).get("filename").toString();
+                System.out.println(f);
+                new SwingFileDownloadHTTP(Res.server_url+"uploads/"+f).setVisible(true);
+
+            }
+        });
+        //end of constructon
     }
     public void setImgExtension(String ext){
-        try {
-            extimg.setIcon(new ImageIcon(new ImageIcon("extension_ico/" + ext + ".png").getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH)));
-        }catch (Exception e){
+            try {
+                extimg.setIcon(new ImageIcon(new ImageIcon("extension_ico/" + ext + ".png").getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH)));
 
-            extimg = new JLabel(new ImageIcon(new ImageIcon("extension_ico/unknown.png").getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH)));
+            }catch (Exception e){
+               //System.out.println(e.toString());
+                extimg = new JLabel(new ImageIcon(new ImageIcon("extension_ico/unknown.png").getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH)));
 
-        }
+            }
+
+
+
 
     }
     private void createUIComponents() {
@@ -119,54 +157,82 @@ public class Home_page extends JFrame {
 
         // TODO: place custom component creation code here
 
-        setImgExtension("unknown");
 
 
-        listupdater();
-        scroller=new JScrollPane(jList1);
+        try {
+            listupdater();
+            scroller = new JScrollPane(jList1);
+        }catch (Exception e){}
     }
 
-    public void listupdater(){
-        jList1 = new JList();
-        filesobj=getdataofuser();
-        ArrayList a = new ArrayList();
-        for(int i=0;i<=totalfiles;i++){
-            a.add(((JSONObject) filesobj.get(Integer.toString(i)) ).get("filename").toString());
+
+
+
+    public void listupdater()throws Exception {
+
+
+            filesobj = getdataofuser();
+        if(filesobj==null){
+            System.out.println("null from server");
+            throw new Exception("its exc");
+        }else {
+            jList1 = new JList();
+
+
+            ArrayList a = new ArrayList();
+            for (int i = 0; i <= totalfiles; i++) {
+                a.add(((JSONObject) filesobj.get(Integer.toString(i))).get("filename").toString());
+            }
+
+
+            jList1.setModel(new DefaultListModel() {
+                ArrayList strings = a;
+
+                public int getSize() {
+                    return strings.size();
+                }
+
+                public Object getElementAt(int i) {
+                    return (String) strings.get(i);
+                }
+            });
+            jList1.addListSelectionListener(new ListSelectionListener() {
+                public void valueChanged(ListSelectionEvent evt) {
+                    if (!jList1.getValueIsAdjusting()) {
+                        //here my code
+                        System.out.println((String) jList1.getSelectedValue());
+                        System.out.println(jList1.getSelectedIndex());
+
+                        deleteFileButton.setVisible(true);
+                        downloadButton.setVisible(true);
+
+                        selectedfileindex = jList1.getSelectedIndex();
+
+                        fileclick(jList1.getSelectedIndex());
+
+                    }
+                }
+            });
+
+
+            setImgExtension("unknown");
+
         }
 
+    }
 
+    public void fileclick(int i){
 
-
-        jList1.setModel(new AbstractListModel() {
-            ArrayList strings = a;
-            public int getSize() {
-                return strings.size();
-            }
-            public Object getElementAt(int i) {
-                return (String)strings.get(i);
-            }
-        });
-        jList1.addListSelectionListener(new ListSelectionListener() {
-            public void valueChanged(ListSelectionEvent evt) {
-                if (!jList1.getValueIsAdjusting()) {
-                    //here my code
-                    System.out.println((String) jList1.getSelectedValue());
-                    System.out.println( jList1.getSelectedIndex());
-
-                    setImgExtension(((JSONObject) filesobj.get(Integer.toString(jList1.getSelectedIndex())) ).get("ext").toString());
-                }
-            }
-        });
-
-
-
-
-
-
+        JSONObject data=(JSONObject) filesobj.get(Integer.toString(i));
+        filename_field.setText(data.get("filename").toString());
+        fileext_field.setText(data.get("ext").toString());
+        fileid_field.setText(data.get("id").toString());
+        filesize_field.setText(data.get("filesize").toString()+" bytes" );
+        setImgExtension(data.get("ext").toString());
     }
 
 
-    private JSONObject getdataofuser(){
+    private JSONObject getdataofuser() throws Exception {
 
 
         try {
@@ -183,14 +249,15 @@ public class Home_page extends JFrame {
 
         }catch (Exception e){
             System.out.println(" errorrr  ");
-            return null;
+            throw new Exception("getdataofuser method error ");
+            //return null;
         }
 
 
     }
 
 
-    public void deleteFile(int id){
+    public void deleteFile(String id){
 
         try {
             URL url = new URL(Res.server_url+"deletefile.php?id="+id);
@@ -199,11 +266,15 @@ public class Home_page extends JFrame {
             int i;
             while ((i = stream.read()) != -1) { //prints returned data character by character to the console
                 System.out.print((char) i);
+
             }
+
         } catch(Exception e) {
             System.out.println(e);
         }
-
+        setVisible(false);
+        new Home_page();
+        dispose();
     }
 
 

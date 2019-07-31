@@ -1,4 +1,4 @@
-package uploader;
+package downloader;
 
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
@@ -8,9 +8,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.io.File;
 
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -21,55 +21,67 @@ import javax.swing.UIManager;
 
 
 /**
- * A Swing application that uploads files to a HTTP server.
+ * A Swing application that downloads file from an HTTP server.
  * @author www.codejava.net
  *
  */
-public class SwingFileUploadHTTP extends JFrame implements
+public class SwingFileDownloadHTTP extends JFrame implements
         PropertyChangeListener {
-    private JLabel labelURL = new JLabel("Upload URL: ");
+    private JLabel labelURL = new JLabel("Download URL: ");
     private JTextField fieldURL = new JTextField(30);
 
-    private JFilePicker filePicker = new JFilePicker("Choose a file: ",
-            "Browse");
+    private JFilePicker filePicker = new JFilePicker("Save in directory: ",
+            "Browse...");
 
-    private JButton buttonUpload = new JButton("Upload");
+    private JButton buttonDownload = new JButton("Download");
+
+    private JLabel labelFileName = new JLabel("File name: ");
+    private JTextField fieldFileName = new JTextField(20);
+
+    private JLabel labelFileSize = new JLabel("File size (bytes): ");
+    private JTextField fieldFileSize = new JTextField(20);
 
     private JLabel labelProgress = new JLabel("Progress:");
     private JProgressBar progressBar = new JProgressBar(0, 100);
-    private String up_url;
 
-    public SwingFileUploadHTTP(String urlll) {
-        super("Swing File Upload to HTTP server");
-        up_url=urlll;
+    public SwingFileDownloadHTTP(String fileurl) {
+        super("Swing File Download from HTTP server");
+
+        fieldURL.setText(fileurl);
+
         // set up layout
+
         setLayout(new GridBagLayout());
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.anchor = GridBagConstraints.WEST;
         constraints.insets = new Insets(5, 5, 5, 5);
 
         // set up components
-        filePicker.setMode(JFilePicker.MODE_OPEN);
+        filePicker.setMode(JFilePicker.MODE_SAVE);
+        filePicker.getFileChooser().setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 
-        buttonUpload.addActionListener(new ActionListener() {
+        buttonDownload.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
-                buttonUploadActionPerformed(event);
+                buttonDownloadActionPerformed(event);
             }
         });
+
+        fieldFileName.setEditable(false);
+        fieldFileSize.setEditable(false);
 
         progressBar.setPreferredSize(new Dimension(200, 30));
         progressBar.setStringPainted(true);
 
         // add components to the frame
-//        constraints.gridx = 0;
-//        constraints.gridy = 0;
-//        add(labelURL, constraints);
-//
-//        constraints.gridx = 1;
-//        constraints.fill = GridBagConstraints.HORIZONTAL;
-//        constraints.weightx = 1.0;
-//        add(fieldURL, constraints);
+        constraints.gridx = 0;
+        constraints.gridy = 0;
+        add(labelURL, constraints);
+
+        constraints.gridx = 1;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.weightx = 1.0;
+        add(fieldURL, constraints);
 
         constraints.gridx = 0;
         constraints.gridy = 1;
@@ -80,10 +92,26 @@ public class SwingFileUploadHTTP extends JFrame implements
 
         constraints.gridy = 2;
         constraints.anchor = GridBagConstraints.CENTER;
-        add(buttonUpload, constraints);
+        add(buttonDownload, constraints);
 
         constraints.gridx = 0;
         constraints.gridy = 3;
+        constraints.gridwidth = 1;
+        constraints.anchor = GridBagConstraints.WEST;
+        add(labelFileName, constraints);
+
+        constraints.gridx = 1;
+        add(fieldFileName, constraints);
+
+        constraints.gridy = 4;
+        constraints.gridx = 0;
+        add(labelFileSize, constraints);
+
+        constraints.gridx = 1;
+        add(fieldFileSize, constraints);
+
+        constraints.gridx = 0;
+        constraints.gridy = 5;
         constraints.gridwidth = 1;
         constraints.anchor = GridBagConstraints.WEST;
         add(labelProgress, constraints);
@@ -101,31 +129,29 @@ public class SwingFileUploadHTTP extends JFrame implements
     /**
      * handle click event of the Upload button
      */
-    private void buttonUploadActionPerformed(ActionEvent event) {
-        //String uploadURL = fieldURL.getText();
-        String uploadURL = up_url;
-        String filePath = filePicker.getSelectedFilePath();
+    private void buttonDownloadActionPerformed(ActionEvent event) {
+        String downloadURL = fieldURL.getText();
+        String saveDir = filePicker.getSelectedFilePath();
 
         // validate input first
-        if (uploadURL.equals("")) {
-            JOptionPane.showMessageDialog(this, "Please enter upload URL!",
+        if (downloadURL.equals("")) {
+            JOptionPane.showMessageDialog(this, "Please enter download URL!",
                     "Error", JOptionPane.ERROR_MESSAGE);
             fieldURL.requestFocus();
             return;
         }
 
-        if (filePath.equals("")) {
+        if (saveDir.equals("")) {
             JOptionPane.showMessageDialog(this,
-                    "Please choose a file to upload!", "Error",
+                    "Please choose a directory save file!", "Error",
                     JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         try {
-            File uploadFile = new File(filePath);
             progressBar.setValue(0);
 
-            UploadTask task = new UploadTask(uploadURL, uploadFile);
+            DownloadTask task = new DownloadTask(this, downloadURL, saveDir);
             task.addPropertyChangeListener(this);
             task.execute();
         } catch (Exception ex) {
@@ -135,12 +161,17 @@ public class SwingFileUploadHTTP extends JFrame implements
         }
     }
 
+    void setFileInfo(String name, int size) {
+        fieldFileName.setText(name);
+        fieldFileSize.setText(String.valueOf(size));
+    }
+
     /**
-     * Update the progress bar's state whenever the progress of upload changes.
+     * Update the progress bar's state whenever the progress of download changes.
      */
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        if ("progress" == evt.getPropertyName()) {
+        if (evt.getPropertyName().equals("progress")) {
             int progress = (Integer) evt.getNewValue();
             progressBar.setValue(progress);
         }
@@ -160,7 +191,7 @@ public class SwingFileUploadHTTP extends JFrame implements
 //        SwingUtilities.invokeLater(new Runnable() {
 //            @Override
 //            public void run() {
-//                new SwingFileUploadHTTP().setVisible(true);
+//                new SwingFileDownloadHTTP().setVisible(true);
 //            }
 //        });
 //    }
